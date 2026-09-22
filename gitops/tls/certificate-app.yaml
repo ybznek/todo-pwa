@@ -1,0 +1,16 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: todo-pwa-tls
+  namespace: todo-pwa-production
+  labels:
+    app.kubernetes.io/name: todo-pwa
+    app.kubernetes.io/part-of: todo-pwa
+spec:
+  secretName: todo-pwa-tls
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+  dnsNames:
+    - todo-pwa.192.168.0.101.sslip.io

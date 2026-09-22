@@ -17,6 +17,27 @@ Postaveno na **Vite 6**, **TypeScript 5** a **vite-plugin-pwa**.
 
 - Node.js 20+
 - Chromium prohlížeč (Chrome, Edge, Opera) kvůli File System Access API
+- Pro nasazenou verzi: důvěryhodný HTTPS certifikát (viz níže)
+
+## HTTPS (homelab)
+
+Nasazená appka běží na **https://todo-pwa.192.168.0.101.sslip.io**.
+
+Certifikát vydává lokální **Homelab CA** (cert-manager). Let's Encrypt na privátní
+`sslip.io` adrese nefunguje — CA je správné řešení pro LAN.
+
+Jednorázově nainstaluj CA na PC, aby prohlížeč HTTPS důvěřoval:
+
+```bash
+./deploy/export-homelab-ca.sh homelab-ca.crt
+# Linux
+sudo cp homelab-ca.crt /usr/local/share/ca-certificates/homelab-ca.crt
+sudo update-ca-certificates
+# macOS
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain homelab-ca.crt
+```
+
+Po instalaci CA funguje File System Access API (přímý zápis `.md` souboru).
 
 ## Spuštění
 

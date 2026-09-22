@@ -1,6 +1,14 @@
-/** @typedef {{ id: string, title: string, done: boolean, timeMs: number, pomodoros: number, created: string, deletedAt?: string }} Task */
+export interface Task {
+  id: string;
+  title: string;
+  done: boolean;
+  timeMs: number;
+  pomodoros: number;
+  created: string;
+  deletedAt?: string;
+}
 
-export function createTask(title) {
+export function createTask(title: string): Task {
   return {
     id: crypto.randomUUID(),
     title: title.trim(),
@@ -11,7 +19,7 @@ export function createTask(title) {
   };
 }
 
-export function formatDuration(ms) {
+export function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -19,7 +27,7 @@ export function formatDuration(ms) {
   return [hours, minutes, seconds].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
-export function formatSession(ms) {
+export function formatSession(ms: number): string {
   const totalSeconds = Math.ceil(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;

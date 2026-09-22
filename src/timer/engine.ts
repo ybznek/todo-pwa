@@ -1,29 +1,40 @@
-import { formatDuration, formatSession } from "../models/task.js";
+import { formatDuration, formatSession } from "../models/task";
 
 const WORK_MS = 25 * 60 * 1000;
 const BREAK_MS = 5 * 60 * 1000;
 
+export type TimerPhase = "work" | "break";
+
+export interface TimerState {
+  activeTaskId: string | null;
+  running: boolean;
+  phase: TimerPhase;
+  timerText: string;
+  sessionText: string;
+  phaseLabel: string;
+}
+
 export class TimerEngine {
-  /** @type {((payload: object) => void) | null} */
-  onChange = null;
+  onChange: ((state: TimerState) => void) | null = null;
+  onPomodoroComplete: ((taskId: string) => void) | null = null;
 
-  /** @type {((taskId: string) => void) | null} */
-  onPomodoroComplete = null;
-
-  activeTaskId = null;
-  phase = "work";
+  activeTaskId: string | null = null;
+  phase: TimerPhase = "work";
   phaseEndsAt = 0;
   sessionStartedAt = 0;
   running = false;
 
-  /** @param {string | null} taskId */
-  setActiveTask(taskId) {
+  timerText = "00:00:00";
+  sessionText = "25:00";
+  phaseLabel = "Práce";
+
+  setActiveTask(taskId: string | null): void {
     this.activeTaskId = taskId;
     this.resetSession("work");
     this.emit();
   }
 
-  start() {
+  start(): void {
     if (!this.activeTaskId) return;
     if (!this.running) {
       this.running = true;
@@ -35,32 +46,29 @@ export class TimerEngine {
     this.emit();
   }
 
-  pause() {
+  pause(): void {
     this.running = false;
     this.emit();
   }
 
-  /** @returns {number} */
-  getElapsedMs() {
+  getElapsedMs(): number {
     if (!this.running || !this.sessionStartedAt) return 0;
     return Date.now() - this.sessionStartedAt;
   }
 
-  /** @returns {number} */
-  getSessionRemainingMs() {
+  getSessionRemainingMs(): number {
     if (!this.phaseEndsAt) return WORK_MS;
     return Math.max(0, this.phaseEndsAt - Date.now());
   }
 
-  /** @param {"work" | "break"} nextPhase */
-  resetSession(nextPhase) {
+  resetSession(nextPhase: TimerPhase): void {
     this.phase = nextPhase;
     this.sessionStartedAt = Date.now();
     this.phaseEndsAt = this.sessionStartedAt + (nextPhase === "work" ? WORK_MS : BREAK_MS);
     this.running = Boolean(this.activeTaskId);
   }
 
-  tick() {
+  tick(): { elapsedMs: number; pomodoroFinished: boolean } {
     if (!this.activeTaskId) return { elapsedMs: 0, pomodoroFinished: false };
 
     let elapsedMs = this.getElapsedMs();
@@ -81,7 +89,7 @@ export class TimerEngine {
     return { elapsedMs, pomodoroFinished };
   }
 
-  emit() {
+  private emit(): void {
     this.timerText = formatDuration(this.getElapsedMs());
     this.sessionText = formatSession(this.getSessionRemainingMs());
     this.phaseLabel = this.phase === "work" ? "Práce" : "Pauza";

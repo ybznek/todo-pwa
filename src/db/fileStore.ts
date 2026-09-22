@@ -1,11 +1,10 @@
-import { parseMarkdown, serializeMarkdown, emptyDocument } from "./markdown.js";
+import { emptyDocument, parseMarkdown, serializeMarkdown, type TodoDocument } from "./markdown";
 
 const HANDLE_DB = "todo-pwa-handles";
 const HANDLE_STORE = "handles";
 const HANDLE_KEY = "current";
 
-/** @returns {Promise<IDBDatabase>} */
-function openHandleDb() {
+function openHandleDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(HANDLE_DB, 1);
     request.onupgradeneeded = () => {
@@ -16,8 +15,7 @@ function openHandleDb() {
   });
 }
 
-/** @param {FileSystemFileHandle | null} handle */
-export async function persistHandle(handle) {
+export async function persistHandle(handle: FileSystemFileHandle | null): Promise<void> {
   const db = await openHandleDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(HANDLE_STORE, "readwrite");
@@ -28,21 +26,18 @@ export async function persistHandle(handle) {
   });
 }
 
-/** @returns {Promise<FileSystemFileHandle | null>} */
-export async function loadPersistedHandle() {
+export async function loadPersistedHandle(): Promise<FileSystemFileHandle | null> {
   const db = await openHandleDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(HANDLE_STORE, "readonly");
     const request = tx.objectStore(HANDLE_STORE).get(HANDLE_KEY);
-    request.onsuccess = () => resolve(request.result ?? null);
+    request.onsuccess = () => resolve((request.result as FileSystemFileHandle | undefined) ?? null);
     request.onerror = () => reject(request.error);
   });
 }
 
-/** @param {FileSystemFileHandle} handle */
-export async function ensureWritePermission(handle) {
-  if (!handle.queryPermission) return true;
-  const opts = { mode: "readwrite" };
+export async function ensureWritePermission(handle: FileSystemFileHandle): Promise<boolean> {
+  const opts: FileSystemHandlePermissionDescriptor = { mode: "readwrite" };
   let permission = await handle.queryPermission(opts);
   if (permission === "granted") return true;
   if (permission === "prompt") {
@@ -51,21 +46,19 @@ export async function ensureWritePermission(handle) {
   return permission === "granted";
 }
 
-/** @param {FileSystemFileHandle} handle */
-export async function readFromHandle(handle) {
+export async function readFromHandle(handle: FileSystemFileHandle): Promise<TodoDocument> {
   const file = await handle.getFile();
   const text = await file.text();
   return parseMarkdown(text);
 }
 
-/** @param {FileSystemFileHandle} handle @param {ReturnType<typeof parseMarkdown>} data */
-export async function writeToHandle(handle, data) {
+export async function writeToHandle(handle: FileSystemFileHandle, data: TodoDocument): Promise<void> {
   const writable = await handle.createWritable();
   await writable.write(serializeMarkdown(data));
   await writable.close();
 }
 
-export async function pickOpenFile() {
+export async function pickOpenFile(): Promise<FileSystemFileHandle> {
   if (!window.showOpenFilePicker) {
     throw new Error("Prohlížeč nepodporuje File System Access API.");
   }
@@ -81,7 +74,7 @@ export async function pickOpenFile() {
   return handle;
 }
 
-export async function pickNewFile() {
+export async function pickNewFile(): Promise<FileSystemFileHandle> {
   if (!window.showSaveFilePicker) {
     throw new Error("Prohlížeč nepodporuje File System Access API.");
   }
@@ -94,12 +87,11 @@ export async function pickNewFile() {
       },
     ],
   });
-  const initial = emptyDocument();
-  await writeToHandle(handle, initial);
+  await writeToHandle(handle, emptyDocument());
   return handle;
 }
 
-export async function tryRestoreHandle() {
+export async function tryRestoreHandle(): Promise<FileSystemFileHandle | null> {
   const handle = await loadPersistedHandle();
   if (!handle) return null;
   const allowed = await ensureWritePermission(handle);

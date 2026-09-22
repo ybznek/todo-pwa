@@ -1,4 +1,10 @@
-/** @typedef {import('../models/task.js').Task} Task */
+import type { Task } from "../models/task";
+
+export interface TodoDocument {
+  activeTaskId: string | null;
+  tasks: Task[];
+  deleted: Task[];
+}
 
 const TASK_LINE =
   /^- \[([ xX])\] (.+?) <!-- id:([^\s]+) time:(\d+) pomodoros:(\d+) created:([^\s]+) -->$/;
@@ -6,14 +12,11 @@ const TASK_LINE =
 const DELETED_LINE =
   /^<!-- smazáno: - \[([ xX])\] (.+?) id:([^\s]+) time:(\d+) pomodoros:(\d+) created:([^\s]+) deleted:([^\s]+) -->$/;
 
-/** @returns {{ activeTaskId: string | null, tasks: Task[], deleted: Task[] }} */
-export function parseMarkdown(content) {
+export function parseMarkdown(content: string): TodoDocument {
   const lines = content.split(/\r?\n/);
-  let activeTaskId = null;
-  /** @type {Task[]} */
-  const tasks = [];
-  /** @type {Task[]} */
-  const deleted = [];
+  let activeTaskId: string | null = null;
+  const tasks: Task[] = [];
+  const deleted: Task[] = [];
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
@@ -55,8 +58,7 @@ export function parseMarkdown(content) {
   return { activeTaskId, tasks, deleted };
 }
 
-/** @param {{ activeTaskId: string | null, tasks: Task[], deleted: Task[] }} data */
-export function serializeMarkdown(data) {
+export function serializeMarkdown(data: TodoDocument): string {
   const lines = [
     "---",
     `active: ${data.activeTaskId ?? ""}`,
@@ -73,7 +75,7 @@ export function serializeMarkdown(data) {
   for (const task of data.tasks) {
     const check = task.done ? "x" : " ";
     lines.push(
-      `- [${check}] ${task.title} <!-- id:${task.id} time:${task.timeMs} pomodoros:${task.pomodoros} created:${task.created} -->`
+      `- [${check}] ${task.title} <!-- id:${task.id} time:${task.timeMs} pomodoros:${task.pomodoros} created:${task.created} -->`,
     );
   }
 
@@ -82,7 +84,7 @@ export function serializeMarkdown(data) {
     for (const task of data.deleted) {
       const check = task.done ? "x" : " ";
       lines.push(
-        `<!-- smazáno: - [${check}] ${task.title} id:${task.id} time:${task.timeMs} pomodoros:${task.pomodoros} created:${task.created} deleted:${task.deletedAt ?? new Date().toISOString()} -->`
+        `<!-- smazáno: - [${check}] ${task.title} id:${task.id} time:${task.timeMs} pomodoros:${task.pomodoros} created:${task.created} deleted:${task.deletedAt ?? new Date().toISOString()} -->`,
       );
     }
   }
@@ -91,11 +93,9 @@ export function serializeMarkdown(data) {
   return lines.join("\n");
 }
 
-/** @param {Task[]} tasks */
-export function emptyDocument(tasks = []) {
-  const first = tasks[0]?.id ?? null;
+export function emptyDocument(tasks: Task[] = []): TodoDocument {
   return {
-    activeTaskId: first,
+    activeTaskId: tasks[0]?.id ?? null,
     tasks,
     deleted: [],
   };

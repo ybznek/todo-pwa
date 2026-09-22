@@ -19,16 +19,23 @@
         <div class="header__actions">
           <button type="button" id="btn-open" class="btn btn--secondary">Otevřít soubor</button>
           <button type="button" id="btn-new" class="btn btn--secondary">Nový soubor</button>
+          <button type="button" id="btn-download" class="btn btn--secondary hidden">Stáhnout .md</button>
           <span id="file-name" class="file-name">Žádný soubor</span>
         </div>
       </header>
 
       <main class="main">
+        <p id="storage-banner" class="storage-banner hidden" role="status"></p>
         <section id="no-file" class="panel panel--empty">
           <h2>Začněte otevřením nebo vytvořením markdown souboru</h2>
           <p>
             Data se ukládají lokálně do <code>.md</code> souboru na vašem PC.
             Smazané úkoly zůstávají v souboru jako komentáře.
+          </p>
+          <p class="panel__hint">
+            Pro přímý zápis do souboru použijte <strong>Chrome/Edge</strong> přes
+            <code>https://</code> nebo <code>localhost</code>. Na HTTP funguje režim
+            s importem a stažením <code>.md</code>.
           </p>
           <div class="panel__actions">
             <button type="button" id="btn-open-empty" class="btn btn--primary">Otevřít soubor</button>

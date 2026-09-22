@@ -59,9 +59,6 @@ export async function writeToHandle(handle: FileSystemFileHandle, data: TodoDocu
 }
 
 export async function pickOpenFile(): Promise<FileSystemFileHandle> {
-  if (!window.showOpenFilePicker) {
-    throw new Error("Prohlížeč nepodporuje File System Access API.");
-  }
   const [handle] = await window.showOpenFilePicker({
     types: [
       {
@@ -75,9 +72,6 @@ export async function pickOpenFile(): Promise<FileSystemFileHandle> {
 }
 
 export async function pickNewFile(): Promise<FileSystemFileHandle> {
-  if (!window.showSaveFilePicker) {
-    throw new Error("Prohlížeč nepodporuje File System Access API.");
-  }
   const handle = await window.showSaveFilePicker({
     suggestedName: "todo.md",
     types: [
@@ -91,9 +85,3 @@ export async function pickNewFile(): Promise<FileSystemFileHandle> {
   return handle;
 }
 
-export async function tryRestoreHandle(): Promise<FileSystemFileHandle | null> {
-  const handle = await loadPersistedHandle();
-  if (!handle) return null;
-  const allowed = await ensureWritePermission(handle);
-  return allowed ? handle : null;
-}

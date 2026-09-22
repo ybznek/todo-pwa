@@ -6,8 +6,15 @@ metadata:
   labels:
     app.kubernetes.io/name: todo-pwa
     app.kubernetes.io/part-of: todo-pwa
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - todo-pwa.192.168.0.101.sslip.io
+      secretName: todo-pwa-tls
   rules:
     - host: todo-pwa.192.168.0.101.sslip.io
       http:

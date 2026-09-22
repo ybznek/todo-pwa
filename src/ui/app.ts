@@ -1,13 +1,17 @@
 import type { TodoDocument } from "../db/markdown";
+import { pickNewFile, pickOpenFile } from "../db/fileStore";
 import {
-  ensureWritePermission,
-  persistHandle,
-  pickNewFile,
-  pickOpenFile,
-  readFromHandle,
-  tryRestoreHandle,
-  writeToHandle,
-} from "../db/fileStore";
+  createDocumentFallback,
+  createDocumentNative,
+  downloadMarkdown,
+  isNativeFileAccessAvailable,
+  openDocumentFromFile,
+  openDocumentNative,
+  pickFileViaInput,
+  restoreDocument,
+  storageModeHint,
+  type TodoStorage,
+} from "../db/storage";
 import { createTask, formatDuration } from "../models/task";
 import { ensureNotificationPermission, showAppNotification } from "../notifications/notifier";
 import type { TimerEngine } from "../timer/engine";
@@ -15,6 +19,7 @@ import type { TimerEngine } from "../timer/engine";
 interface AppElements {
   noFile: HTMLElement;
   workspace: HTMLElement;
+  storageBanner: HTMLElement;
   fileName: HTMLElement;
   activeTitle: HTMLElement;
   timerDisplay: HTMLElement;
@@ -24,6 +29,7 @@ interface AppElements {
   taskList: HTMLUListElement;
   addForm: HTMLFormElement;
   addInput: HTMLInputElement;
+  btnDownload: HTMLButtonElement;
 }
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -33,7 +39,7 @@ function requireElement<T extends HTMLElement>(id: string): T {
 }
 
 export class TodoApp {
-  fileHandle: FileSystemFileHandle | null = null;
+  storage: TodoStorage | null = null;
   data: TodoDocument = { activeTaskId: null, tasks: [], deleted: [] };
   tickInterval: number | null = null;
   saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -46,6 +52,7 @@ export class TodoApp {
     this.els = {
       noFile: requireElement("no-file"),
       workspace: requireElement("workspace"),
+      storageBanner: requireElement("storage-banner"),
       fileName: requireElement("file-name"),
       activeTitle: document.querySelector("#active-task .active-task__title") as HTMLElement,
       timerDisplay: requireElement("timer-display"),
@@ -55,6 +62,7 @@ export class TodoApp {
       taskList: requireElement("task-list"),
       addForm: requireElement("add-form"),
       addInput: requireElement("add-input"),
+      btnDownload: requireElement("btn-download"),
     };
 
     this.timer.onChange = () => this.renderTimer();
@@ -75,18 +83,24 @@ export class TodoApp {
       void this.addTask(this.els.addInput.value);
       this.els.addInput.value = "";
     });
+
+    this.els.btnDownload.addEventListener("click", () => this.exportMarkdown());
   }
 
   async init(): Promise<void> {
     this.bind();
-    const restored = await tryRestoreHandle();
-    if (restored) await this.useHandle(restored);
+    const restored = await restoreDocument();
+    if (restored) await this.useStorage(restored);
     this.render();
   }
 
   async openFile(): Promise<void> {
     try {
-      await this.useHandle(await pickOpenFile());
+      if (isNativeFileAccessAvailable()) {
+        await this.useStorage(await openDocumentNative(await pickOpenFile()));
+        return;
+      }
+      await this.useStorage(await openDocumentFromFile(await pickFileViaInput()));
     } catch (error) {
       if (!isAbortError(error)) this.alertError(error);
     }
@@ -94,19 +108,19 @@ export class TodoApp {
 
   async newFile(): Promise<void> {
     try {
-      await this.useHandle(await pickNewFile());
+      if (isNativeFileAccessAvailable()) {
+        await this.useStorage(await createDocumentNative(await pickNewFile()));
+        return;
+      }
+      await this.useStorage(await createDocumentFallback());
     } catch (error) {
       if (!isAbortError(error)) this.alertError(error);
     }
   }
 
-  async useHandle(handle: FileSystemFileHandle): Promise<void> {
-    const allowed = await ensureWritePermission(handle);
-    if (!allowed) throw new Error("Chybí oprávnění k zápisu do souboru.");
-
-    this.fileHandle = handle;
-    this.data = await readFromHandle(handle);
-    await persistHandle(handle);
+  async useStorage(storage: TodoStorage): Promise<void> {
+    this.storage = storage;
+    this.data = await storage.read();
 
     if (!this.data.activeTaskId && this.data.tasks.length) {
       this.data.activeTaskId =
@@ -163,7 +177,7 @@ export class TodoApp {
 
   async addTask(title: string): Promise<void> {
     const trimmed = title.trim();
-    if (!trimmed || !this.fileHandle) return;
+    if (!trimmed || !this.storage) return;
 
     const task = createTask(trimmed);
     this.data.tasks.unshift(task);
@@ -238,16 +252,27 @@ export class TodoApp {
   }
 
   async saveNow(): Promise<void> {
-    if (!this.fileHandle) return;
+    if (!this.storage) return;
     this.flushElapsedTime();
-    await writeToHandle(this.fileHandle, this.data);
+    await this.storage.write(this.data);
+  }
+
+  exportMarkdown(): void {
+    if (!this.storage) return;
+    this.flushElapsedTime();
+    downloadMarkdown(this.storage.name, this.data);
   }
 
   render(): void {
-    const hasFile = Boolean(this.fileHandle);
+    const hasFile = Boolean(this.storage);
     this.els.noFile.classList.toggle("hidden", hasFile);
     this.els.workspace.classList.toggle("hidden", !hasFile);
-    this.els.fileName.textContent = hasFile ? this.fileHandle!.name : "Žádný soubor";
+    this.els.fileName.textContent = hasFile ? this.storage!.name : "Žádný soubor";
+    this.els.storageBanner.textContent = storageModeHint(this.storage?.mode ?? null);
+    this.els.storageBanner.classList.toggle("hidden", !hasFile);
+    this.els.storageBanner.classList.toggle("storage-banner--native", this.storage?.mode === "native");
+    this.els.storageBanner.classList.toggle("storage-banner--fallback", this.storage?.mode === "fallback");
+    this.els.btnDownload.classList.toggle("hidden", !hasFile || this.storage?.mode === "native");
     this.renderActivePanel();
     this.renderTaskList();
     this.renderTimer();

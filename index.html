@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="description" content="Todo list PWA s ukládáním do markdown souboru" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <title>Todo PWA</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <div class="header__brand">
+          <img src="/icons/icon.svg" alt="" width="32" height="32" />
+          <h1>Todo PWA</h1>
+        </div>
+        <div class="header__actions">
+          <button type="button" id="btn-open" class="btn btn--secondary">Otevřít soubor</button>
+          <button type="button" id="btn-new" class="btn btn--secondary">Nový soubor</button>
+          <span id="file-name" class="file-name">Žádný soubor</span>
+        </div>
+      </header>
+
+      <main class="main">
+        <section id="no-file" class="panel panel--empty">
+          <h2>Začněte otevřením nebo vytvořením markdown souboru</h2>
+          <p>
+            Data se ukládají lokálně do <code>.md</code> souboru na vašem PC.
+            Smazané úkoly zůstávají v souboru jako komentáře.
+          </p>
+          <div class="panel__actions">
+            <button type="button" id="btn-open-empty" class="btn btn--primary">Otevřít soubor</button>
+            <button type="button" id="btn-new-empty" class="btn btn--secondary">Vytvořit nový</button>
+          </div>
+        </section>
+
+        <div id="workspace" class="workspace hidden">
+          <section class="panel panel--active">
+            <h2>Aktivní úkol</h2>
+            <div id="active-task" class="active-task">
+              <p class="active-task__title">—</p>
+              <div class="stats">
+                <div class="stat">
+                  <span class="stat__label">Časovač</span>
+                  <span id="timer-display" class="stat__value">00:00:00</span>
+                </div>
+                <div class="stat">
+                  <span class="stat__label">Pomodoro</span>
+                  <span id="pomodoro-display" class="stat__value">0</span>
+                </div>
+                <div class="stat">
+                  <span class="stat__label">Relace</span>
+                  <span id="session-display" class="stat__value">25:00</span>
+                </div>
+                <div class="stat">
+                  <span class="stat__label">Fáze</span>
+                  <span id="phase-display" class="stat__value">Práce</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel panel--tasks">
+            <div class="panel__header">
+              <h2>Úkoly</h2>
+              <form id="add-form" class="add-form">
+                <input
+                  id="add-input"
+                  type="text"
+                  placeholder="Nový úkol…"
+                  autocomplete="off"
+                  required
+                />
+                <button type="submit" class="btn btn--primary">Přidat</button>
+              </form>
+            </div>
+            <ul id="task-list" class="task-list"></ul>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>

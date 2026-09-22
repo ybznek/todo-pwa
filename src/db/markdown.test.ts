@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTask } from "../models/task";
+import { createSubtask, createTask } from "../models/task";
 import { emptyDocument, parseMarkdown, serializeMarkdown } from "./markdown";
 
 describe("markdown database", () => {
@@ -22,8 +22,26 @@ describe("markdown database", () => {
     });
   });
 
+  it("round-trips subtasks and notes", () => {
+    const task = createTask("Nákup");
+    const sub1 = createSubtask("Mléko");
+    sub1.done = true;
+    task.subtasks = [sub1, createSubtask("Chleba")];
+    task.notes = "Preferovat bio\nVezít tašku";
+
+    const parsed = parseMarkdown(serializeMarkdown(emptyDocument([task]))).tasks[0];
+
+    expect(parsed.subtasks).toHaveLength(2);
+    expect(parsed.subtasks[0]).toMatchObject({ title: "Mléko", done: true });
+    expect(parsed.subtasks[1]).toMatchObject({ title: "Chleba", done: false });
+    expect(parsed.notes).toBe("Preferovat bio\nVezít tašku");
+  });
+
   it("keeps deleted tasks as comments", () => {
     const task = createTask("Starý úkol");
+    task.subtasks = [createSubtask("Podúkol")];
+    task.notes = "poznámka";
+
     const markdown = serializeMarkdown({
       activeTaskId: null,
       tasks: [],
@@ -31,6 +49,9 @@ describe("markdown database", () => {
     });
 
     expect(markdown).toContain("<!-- smazáno:");
-    expect(parseMarkdown(markdown).deleted).toHaveLength(1);
+    const parsed = parseMarkdown(markdown).deleted[0];
+    expect(parsed.title).toBe("Starý úkol");
+    expect(parsed.subtasks).toHaveLength(1);
+    expect(parsed.notes).toBe("poznámka");
   });
 });

@@ -12,9 +12,11 @@ import {
   storageModeHint,
   type TodoStorage,
 } from "../db/storage";
-import { createTask, formatDuration } from "../models/task";
+import { createSubtask, createTask, formatDuration, subtaskProgress, type Task } from "../models/task";
 import { ensureNotificationPermission, showAppNotification } from "../notifications/notifier";
 import type { TimerEngine } from "../timer/engine";
+
+const APP_TITLE = "Todo PWA";
 
 interface AppElements {
   noFile: HTMLElement;
@@ -22,6 +24,11 @@ interface AppElements {
   storageBanner: HTMLElement;
   fileName: HTMLElement;
   activeTitle: HTMLElement;
+  activeDetails: HTMLElement;
+  activeNotes: HTMLTextAreaElement;
+  subtaskList: HTMLUListElement;
+  addSubtaskForm: HTMLFormElement;
+  addSubtaskInput: HTMLInputElement;
   timerDisplay: HTMLElement;
   pomodoroDisplay: HTMLElement;
   sessionDisplay: HTMLElement;
@@ -43,6 +50,7 @@ export class TodoApp {
   data: TodoDocument = { activeTaskId: null, tasks: [], deleted: [] };
   tickInterval: number | null = null;
   saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private activeNotesTaskId: string | null = null;
 
   private readonly els: AppElements;
   private readonly timer: TimerEngine;
@@ -55,6 +63,11 @@ export class TodoApp {
       storageBanner: requireElement("storage-banner"),
       fileName: requireElement("file-name"),
       activeTitle: document.querySelector("#active-task .active-task__title") as HTMLElement,
+      activeDetails: requireElement("active-details"),
+      activeNotes: requireElement("active-notes"),
+      subtaskList: requireElement("subtask-list"),
+      addSubtaskForm: requireElement("add-subtask-form"),
+      addSubtaskInput: requireElement("add-subtask-input"),
       timerDisplay: requireElement("timer-display"),
       pomodoroDisplay: requireElement("pomodoro-display"),
       sessionDisplay: requireElement("session-display"),
@@ -82,6 +95,19 @@ export class TodoApp {
       event.preventDefault();
       void this.addTask(this.els.addInput.value);
       this.els.addInput.value = "";
+    });
+
+    this.els.addSubtaskForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void this.addSubtask(this.els.addSubtaskInput.value);
+      this.els.addSubtaskInput.value = "";
+    });
+
+    this.els.activeNotes.addEventListener("input", () => {
+      const active = this.getActiveTask();
+      if (!active) return;
+      active.notes = this.els.activeNotes.value;
+      this.scheduleSave();
     });
 
     this.els.btnDownload.addEventListener("click", () => this.exportMarkdown());
@@ -134,8 +160,12 @@ export class TodoApp {
     this.render();
   }
 
+  private getActiveTask(): Task | undefined {
+    return this.data.tasks.find((task) => task.id === this.data.activeTaskId);
+  }
+
   private syncTimerWithData(): void {
-    const active = this.data.tasks.find((task) => task.id === this.data.activeTaskId);
+    const active = this.getActiveTask();
     this.timer.setActiveTask(active && !active.done ? active.id : null);
     if (active && !active.done) this.timer.start();
     else this.timer.pause();
@@ -185,6 +215,38 @@ export class TodoApp {
     this.syncTimerWithData();
     await this.saveNow();
     this.render();
+  }
+
+  async addSubtask(title: string): Promise<void> {
+    const trimmed = title.trim();
+    const active = this.getActiveTask();
+    if (!trimmed || !active) return;
+
+    active.subtasks.push(createSubtask(trimmed));
+    await this.saveNow();
+    this.renderActiveDetails();
+    this.renderTaskList();
+  }
+
+  async toggleSubtask(subtaskId: string): Promise<void> {
+    const active = this.getActiveTask();
+    const subtask = active?.subtasks.find((item) => item.id === subtaskId);
+    if (!subtask) return;
+
+    subtask.done = !subtask.done;
+    await this.saveNow();
+    this.renderActiveDetails();
+    this.renderTaskList();
+  }
+
+  async deleteSubtask(subtaskId: string): Promise<void> {
+    const active = this.getActiveTask();
+    if (!active) return;
+
+    active.subtasks = active.subtasks.filter((item) => item.id !== subtaskId);
+    await this.saveNow();
+    this.renderActiveDetails();
+    this.renderTaskList();
   }
 
   async setActive(taskId: string): Promise<void> {
@@ -274,18 +336,77 @@ export class TodoApp {
     this.els.storageBanner.classList.toggle("storage-banner--fallback", this.storage?.mode === "fallback");
     this.els.btnDownload.classList.toggle("hidden", !hasFile || this.storage?.mode === "native");
     this.renderActivePanel();
+    this.renderActiveDetails();
     this.renderTaskList();
     this.renderTimer();
+    this.updateDocumentTitle();
+  }
+
+  private updateDocumentTitle(): void {
+    const active = this.getActiveTask();
+    document.title = active ? `${active.title} · ${APP_TITLE}` : APP_TITLE;
   }
 
   private renderActivePanel(): void {
-    const active = this.data.tasks.find((task) => task.id === this.data.activeTaskId);
+    const active = this.getActiveTask();
     this.els.activeTitle.textContent = active?.title ?? "Vyberte úkol kliknutím";
     this.els.pomodoroDisplay.textContent = String(active?.pomodoros ?? 0);
     this.els.timerDisplay.textContent = formatDuration(
       (active?.timeMs ?? 0) +
         (this.timer.activeTaskId === active?.id ? this.timer.getElapsedMs() : 0),
     );
+  }
+
+  private renderActiveDetails(): void {
+    const active = this.getActiveTask();
+    const hasActive = Boolean(active && !active.done);
+    this.els.activeDetails.classList.toggle("hidden", !hasActive);
+
+    if (!active || active.done) {
+      this.activeNotesTaskId = null;
+      return;
+    }
+
+    if (this.activeNotesTaskId !== active.id) {
+      this.els.activeNotes.value = active.notes;
+      this.activeNotesTaskId = active.id;
+    }
+
+    this.els.subtaskList.replaceChildren();
+
+    if (!active.subtasks.length) {
+      const empty = document.createElement("li");
+      empty.className = "subtask-item";
+      empty.style.gridTemplateColumns = "1fr";
+      empty.innerHTML = `<span class="subtask-item__title" style="color:var(--muted)">Zatím žádné podúkoly</span>`;
+      this.els.subtaskList.append(empty);
+      return;
+    }
+
+    for (const subtask of active.subtasks) {
+      const item = document.createElement("li");
+      item.className = "subtask-item";
+      if (subtask.done) item.classList.add("subtask-item--done");
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "task-item__checkbox";
+      checkbox.checked = subtask.done;
+      checkbox.addEventListener("change", () => void this.toggleSubtask(subtask.id));
+
+      const title = document.createElement("span");
+      title.className = "subtask-item__title";
+      title.textContent = subtask.title;
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "btn btn--danger";
+      deleteButton.textContent = "×";
+      deleteButton.addEventListener("click", () => void this.deleteSubtask(subtask.id));
+
+      item.append(checkbox, title, deleteButton);
+      this.els.subtaskList.append(item);
+    }
   }
 
   private renderTimer(): void {
@@ -326,8 +447,16 @@ export class TodoApp {
         task.id === this.data.activeTaskId && this.timer.activeTaskId === task.id
           ? this.timer.getElapsedMs()
           : 0;
+      const progress = subtaskProgress(task);
+      const badge =
+        progress.total > 0
+          ? `<span class="task-item__badge">${progress.done}/${progress.total}</span>`
+          : task.notes.trim()
+            ? `<span class="task-item__badge">📝</span>`
+            : "";
+
       body.innerHTML = `
-        <div class="task-item__title">${escapeHtml(task.title)}</div>
+        <div class="task-item__title">${escapeHtml(task.title)}${badge}</div>
         <div class="task-item__meta">${formatDuration(task.timeMs + liveExtra)} · ${task.pomodoros} pomodoro</div>
       `;
 

@@ -1,3 +1,9 @@
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -5,6 +11,8 @@ export interface Task {
   timeMs: number;
   pomodoros: number;
   created: string;
+  subtasks: Subtask[];
+  notes: string;
   deletedAt?: string;
 }
 
@@ -16,7 +24,23 @@ export function createTask(title: string): Task {
     timeMs: 0,
     pomodoros: 0,
     created: new Date().toISOString(),
+    subtasks: [],
+    notes: "",
   };
+}
+
+export function createSubtask(title: string): Subtask {
+  return {
+    id: crypto.randomUUID(),
+    title: title.trim(),
+    done: false,
+  };
+}
+
+export function subtaskProgress(task: Task): { done: number; total: number } {
+  const total = task.subtasks.length;
+  const done = task.subtasks.filter((subtask) => subtask.done).length;
+  return { done, total };
 }
 
 export function formatDuration(ms: number): string {

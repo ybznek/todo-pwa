@@ -66,6 +66,30 @@
                   <span id="phase-display" class="stat__value">Práce</span>
                 </div>
               </div>
+              <div id="active-details" class="active-details hidden">
+                <label class="field-label" for="active-notes">Poznámky</label>
+                <textarea
+                  id="active-notes"
+                  class="active-notes"
+                  rows="4"
+                  placeholder="Poznámky k aktivnímu úkolu…"
+                ></textarea>
+                <div class="subtasks">
+                  <div class="subtasks__header">
+                    <h3>Podúkoly</h3>
+                  </div>
+                  <ul id="subtask-list" class="subtask-list"></ul>
+                  <form id="add-subtask-form" class="add-subtask-form">
+                    <input
+                      id="add-subtask-input"
+                      type="text"
+                      placeholder="Nový podúkol…"
+                      autocomplete="off"
+                    />
+                    <button type="submit" class="btn btn--secondary">Přidat</button>
+                  </form>
+                </div>
+              </div>
             </div>
           </section>
 

@@ -340,6 +340,12 @@ body {
   max-width: 420px;
 }
 
+.add-form--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.add-form textarea,
 .add-form input {
   flex: 1;
   border: 1px solid var(--border);
@@ -348,6 +354,19 @@ body {
   font: inherit;
   background: var(--bg);
   color: var(--text);
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.field-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.add-form__hint {
+  flex-basis: 100%;
+  max-width: 420px;
 }
 
 .task-list {

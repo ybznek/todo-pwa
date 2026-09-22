@@ -74,21 +74,14 @@
                   rows="4"
                   placeholder="Poznámky k aktivnímu úkolu…"
                 ></textarea>
-                <div class="subtasks">
-                  <div class="subtasks__header">
-                    <h3>Podúkoly</h3>
-                  </div>
-                  <ul id="subtask-list" class="subtask-list"></ul>
-                  <form id="add-subtask-form" class="add-subtask-form">
-                    <input
-                      id="add-subtask-input"
-                      type="text"
-                      placeholder="Nový podúkol…"
-                      autocomplete="off"
-                    />
-                    <button type="submit" class="btn btn--secondary">Přidat</button>
-                  </form>
-                </div>
+                <label class="field-label" for="subtasks-editor">Podúkoly (odrážky)</label>
+                <textarea
+                  id="subtasks-editor"
+                  class="active-notes"
+                  rows="5"
+                  placeholder="- [ ] První podúkol&#10;- [ ] Druhý podúkol"
+                ></textarea>
+                <p class="field-hint">Piš odrážky — hotové označ `- [x]`. Ukládá se automaticky.</p>
               </div>
             </div>
           </section>
@@ -96,16 +89,17 @@
           <section class="panel panel--tasks">
             <div class="panel__header">
               <h2>Úkoly</h2>
-              <form id="add-form" class="add-form">
-                <input
+              <form id="add-form" class="add-form add-form--stacked">
+                <textarea
                   id="add-input"
-                  type="text"
-                  placeholder="Nový úkol…"
+                  rows="4"
+                  placeholder="- Hlavní úkol&#10;  - podúkol&#10;  - podúkol&#10;- Další úkol"
                   autocomplete="off"
                   required
-                />
+                ></textarea>
                 <button type="submit" class="btn btn--primary">Přidat</button>
               </form>
+              <p class="field-hint add-form__hint">Jedna odrážka = úkol, odsazené odrážky = podúkoly.</p>
             </div>
             <ul id="task-list" class="task-list"></ul>
           </section>

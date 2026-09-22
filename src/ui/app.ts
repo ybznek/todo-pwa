@@ -1,3 +1,9 @@
+import {
+  looksLikeBulletList,
+  parseSubtaskBullets,
+  parseTaskTree,
+  subtasksToBulletText,
+} from "../db/bullets";
 import type { TodoDocument } from "../db/markdown";
 import { pickNewFile, pickOpenFile } from "../db/fileStore";
 import {
@@ -26,16 +32,14 @@ interface AppElements {
   activeTitle: HTMLElement;
   activeDetails: HTMLElement;
   activeNotes: HTMLTextAreaElement;
-  subtaskList: HTMLUListElement;
-  addSubtaskForm: HTMLFormElement;
-  addSubtaskInput: HTMLInputElement;
+  subtasksEditor: HTMLTextAreaElement;
   timerDisplay: HTMLElement;
   pomodoroDisplay: HTMLElement;
   sessionDisplay: HTMLElement;
   phaseDisplay: HTMLElement;
   taskList: HTMLUListElement;
   addForm: HTMLFormElement;
-  addInput: HTMLInputElement;
+  addInput: HTMLTextAreaElement;
   btnDownload: HTMLButtonElement;
 }
 
@@ -51,6 +55,7 @@ export class TodoApp {
   tickInterval: number | null = null;
   saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private activeNotesTaskId: string | null = null;
+  private activeSubtasksTaskId: string | null = null;
 
   private readonly els: AppElements;
   private readonly timer: TimerEngine;
@@ -65,9 +70,7 @@ export class TodoApp {
       activeTitle: document.querySelector("#active-task .active-task__title") as HTMLElement,
       activeDetails: requireElement("active-details"),
       activeNotes: requireElement("active-notes"),
-      subtaskList: requireElement("subtask-list"),
-      addSubtaskForm: requireElement("add-subtask-form"),
-      addSubtaskInput: requireElement("add-subtask-input"),
+      subtasksEditor: requireElement("subtasks-editor"),
       timerDisplay: requireElement("timer-display"),
       pomodoroDisplay: requireElement("pomodoro-display"),
       sessionDisplay: requireElement("session-display"),
@@ -93,14 +96,8 @@ export class TodoApp {
 
     this.els.addForm.addEventListener("submit", (event) => {
       event.preventDefault();
-      void this.addTask(this.els.addInput.value);
+      void this.addFromInput(this.els.addInput.value);
       this.els.addInput.value = "";
-    });
-
-    this.els.addSubtaskForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      void this.addSubtask(this.els.addSubtaskInput.value);
-      this.els.addSubtaskInput.value = "";
     });
 
     this.els.activeNotes.addEventListener("input", () => {
@@ -108,6 +105,14 @@ export class TodoApp {
       if (!active) return;
       active.notes = this.els.activeNotes.value;
       this.scheduleSave();
+    });
+
+    this.els.subtasksEditor.addEventListener("input", () => {
+      const active = this.getActiveTask();
+      if (!active) return;
+      active.subtasks = parseSubtaskBullets(this.els.subtasksEditor.value, active.subtasks);
+      this.scheduleSave();
+      this.renderTaskList();
     });
 
     this.els.btnDownload.addEventListener("click", () => this.exportMarkdown());
@@ -205,48 +210,36 @@ export class TodoApp {
     void showAppNotification("Pauza skončila", `${task.title} — zpět do práce.`);
   }
 
-  async addTask(title: string): Promise<void> {
-    const trimmed = title.trim();
+  async addFromInput(raw: string): Promise<void> {
+    const trimmed = raw.trim();
     if (!trimmed || !this.storage) return;
 
-    const task = createTask(trimmed);
-    this.data.tasks.unshift(task);
-    this.data.activeTaskId = task.id;
+    if (looksLikeBulletList(trimmed)) {
+      const parsedTasks = parseTaskTree(trimmed);
+      if (!parsedTasks.length) return;
+
+      const createdIds: string[] = [];
+      for (const item of [...parsedTasks].reverse()) {
+        const task = createTask(item.title);
+        task.done = item.done;
+        task.subtasks = item.subtasks.map((subtask) => ({
+          ...createSubtask(subtask.title),
+          done: subtask.done,
+        }));
+        this.data.tasks.unshift(task);
+        createdIds.unshift(task.id);
+      }
+
+      this.data.activeTaskId = createdIds[0] ?? null;
+    } else {
+      const task = createTask(trimmed);
+      this.data.tasks.unshift(task);
+      this.data.activeTaskId = task.id;
+    }
+
     this.syncTimerWithData();
     await this.saveNow();
     this.render();
-  }
-
-  async addSubtask(title: string): Promise<void> {
-    const trimmed = title.trim();
-    const active = this.getActiveTask();
-    if (!trimmed || !active) return;
-
-    active.subtasks.push(createSubtask(trimmed));
-    await this.saveNow();
-    this.renderActiveDetails();
-    this.renderTaskList();
-  }
-
-  async toggleSubtask(subtaskId: string): Promise<void> {
-    const active = this.getActiveTask();
-    const subtask = active?.subtasks.find((item) => item.id === subtaskId);
-    if (!subtask) return;
-
-    subtask.done = !subtask.done;
-    await this.saveNow();
-    this.renderActiveDetails();
-    this.renderTaskList();
-  }
-
-  async deleteSubtask(subtaskId: string): Promise<void> {
-    const active = this.getActiveTask();
-    if (!active) return;
-
-    active.subtasks = active.subtasks.filter((item) => item.id !== subtaskId);
-    await this.saveNow();
-    this.renderActiveDetails();
-    this.renderTaskList();
   }
 
   async setActive(taskId: string): Promise<void> {
@@ -364,6 +357,7 @@ export class TodoApp {
 
     if (!active || active.done) {
       this.activeNotesTaskId = null;
+      this.activeSubtasksTaskId = null;
       return;
     }
 
@@ -372,40 +366,9 @@ export class TodoApp {
       this.activeNotesTaskId = active.id;
     }
 
-    this.els.subtaskList.replaceChildren();
-
-    if (!active.subtasks.length) {
-      const empty = document.createElement("li");
-      empty.className = "subtask-item";
-      empty.style.gridTemplateColumns = "1fr";
-      empty.innerHTML = `<span class="subtask-item__title" style="color:var(--muted)">Zatím žádné podúkoly</span>`;
-      this.els.subtaskList.append(empty);
-      return;
-    }
-
-    for (const subtask of active.subtasks) {
-      const item = document.createElement("li");
-      item.className = "subtask-item";
-      if (subtask.done) item.classList.add("subtask-item--done");
-
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.className = "task-item__checkbox";
-      checkbox.checked = subtask.done;
-      checkbox.addEventListener("change", () => void this.toggleSubtask(subtask.id));
-
-      const title = document.createElement("span");
-      title.className = "subtask-item__title";
-      title.textContent = subtask.title;
-
-      const deleteButton = document.createElement("button");
-      deleteButton.type = "button";
-      deleteButton.className = "btn btn--danger";
-      deleteButton.textContent = "×";
-      deleteButton.addEventListener("click", () => void this.deleteSubtask(subtask.id));
-
-      item.append(checkbox, title, deleteButton);
-      this.els.subtaskList.append(item);
+    if (this.activeSubtasksTaskId !== active.id) {
+      this.els.subtasksEditor.value = subtasksToBulletText(active.subtasks);
+      this.activeSubtasksTaskId = active.id;
     }
   }
 

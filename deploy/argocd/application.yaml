@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: todo-pwa
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: todo-pwa
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ybznek/todo-pwa.git
+    targetRevision: main
+    path: gitops
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: todo-pwa-production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

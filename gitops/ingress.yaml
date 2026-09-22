@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: todo-pwa
+  namespace: todo-pwa-production
+  labels:
+    app.kubernetes.io/name: todo-pwa
+    app.kubernetes.io/part-of: todo-pwa
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: todo-pwa.192.168.0.101.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

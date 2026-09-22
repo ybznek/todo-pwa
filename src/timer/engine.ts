@@ -17,6 +17,7 @@ export interface TimerState {
 export class TimerEngine {
   onChange: ((state: TimerState) => void) | null = null;
   onPomodoroComplete: ((taskId: string) => void) | null = null;
+  onBreakComplete: ((taskId: string) => void) | null = null;
 
   activeTaskId: string | null = null;
   phase: TimerPhase = "work";
@@ -80,6 +81,7 @@ export class TimerEngine {
         this.onPomodoroComplete?.(this.activeTaskId);
         this.resetSession("break");
       } else {
+        this.onBreakComplete?.(this.activeTaskId);
         this.resetSession("work");
       }
       elapsedMs = this.getElapsedMs();

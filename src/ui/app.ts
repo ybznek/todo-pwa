@@ -9,6 +9,7 @@ import {
   writeToHandle,
 } from "../db/fileStore";
 import { createTask, formatDuration } from "../models/task";
+import { ensureNotificationPermission, showAppNotification } from "../notifications/notifier";
 import type { TimerEngine } from "../timer/engine";
 
 interface AppElements {
@@ -58,6 +59,7 @@ export class TodoApp {
 
     this.timer.onChange = () => this.renderTimer();
     this.timer.onPomodoroComplete = (taskId) => this.handlePomodoroComplete(taskId);
+    this.timer.onBreakComplete = (taskId) => this.handleBreakComplete(taskId);
   }
 
   bind(): void {
@@ -114,6 +116,7 @@ export class TodoApp {
 
     this.syncTimerWithData();
     this.startTicking();
+    void ensureNotificationPermission();
     this.render();
   }
 
@@ -147,8 +150,15 @@ export class TodoApp {
     const task = this.data.tasks.find((item) => item.id === taskId);
     if (!task) return;
     task.pomodoros += 1;
+    void showAppNotification("Pomodoro dokončeno", `${task.title} — čas na 5min pauzu.`);
     void this.saveNow();
     this.render();
+  }
+
+  private handleBreakComplete(taskId: string): void {
+    const task = this.data.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    void showAppNotification("Pauza skončila", `${task.title} — zpět do práce.`);
   }
 
   async addTask(title: string): Promise<void> {
